@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>threnic-shaders • Demo</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  color: #e0e0e0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 12px;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+}
+
+#panel {
+  position: fixed;
+  top: 16px; left: 16px;
+  width: 280px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  z-index: 10;
+  background: rgba(10, 10, 15, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+#panel::-webkit-scrollbar { width: 4px; }
+#panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+.panel-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #fff;
+  margin-bottom: 2px;
+}
+.panel-subtitle {
+  font-size: 10px;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.group { display: flex; flex-direction: column; gap: 6px; }
+.group-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: rgba(255,255,255,0.35);
+}
+
+select, input[type="range"] {
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+}
+select {
+  padding: 6px 8px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M3 5l3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+select:hover { border-color: rgba(255,255,255,0.25); }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255,255,255,0.4);
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.slider-row label {
+  flex: 0 0 70px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.slider-row input { flex: 1; }
+.slider-row .val {
+  flex: 0 0 32px;
+  text-align: right;
+  font-size: 10px;
+  color: rgba(255,255,255,0.6);
+}
+
+.blend-btns {
+  display: flex; gap: 4px;
+}
+.blend-btns button {
+  flex: 1;
+  padding: 5px 0;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.blend-btns button.active {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.3);
+  color: #fff;
+}
+.blend-btns button:hover { border-color: rgba(255,255,255,0.25); }
+
+.audio-section {
+  display: flex; align-items: center; gap: 8px;
+}
+#micBtn, #fileBtn {
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+#micBtn:hover, #fileBtn:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
+#micBtn.active { background: rgba(200, 50, 50, 0.3); border-color: rgba(255, 80, 80, 0.5); color: #ff8888; }
+#fileInput { display: none; }
+
+.meters {
+  display: flex; gap: 6px; align-items: flex-end; height: 40px;
+  padding: 4px 0;
+}
+.meter {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.meter-bar-wrap {
+  width: 100%; height: 30px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+.meter-bar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, #ff6b35, #ffcc02);
+  border-radius: 2px;
+  transition: height 0.05s;
+}
+.meter-label {
+  font-size: 8px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.5px;
+}
+
+#beatDot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  transition: background 0.05s, box-shadow 0.05s;
+  margin-left: auto;
+}
+#beatDot.flash {
+  background: #ff4444;
+  box-shadow: 0 0 12px #ff4444;
+}
+
+.beat-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.beat-row span {
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+#error {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 10, 10, 0.95);
+  border: 1px solid rgba(255, 60, 60, 0.3);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  max-width: 400px;
+  z-index: 100;
+  display: none;
+}
+#error h2 { color: #ff6b6b; margin-bottom: 8px; font-size: 14px; }
+#error p { color: rgba(255,255,255,0.6); font-size: 11px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="panel">
+  <div>
+    <div class="panel-title">threnic-shaders</div>
+    <div class="panel-subtitle">WebGPU Shader Overlay Engine</div>
+  </div>
+
+  <div class="group">
+    <div class="group-label">Preset</div>
+    <select id="presetSel">
+      <option value="tunnel">Stony Cave Tunnel</option>
+      <option value="warp">Star Warp</option>
+      <option value="clouds">Cloud Flight</option>
+      <option value="volumetric">Volumetric Clouds</option>
+      <option value="storm">Storm Clouds</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <div class="group-label">Palette</div>
+    <select id="paletteSel">
+      <option value="ember">Ember</option>
+      <option value="ice">Ice</option>
+      <option value="toxic">Toxic</option>
+      <option value="vaporwave">Vaporwave</option>
+      <option value="mono">Bone</option>
+      <option value="stone">Stone</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <div class="group-label">Blend Mode</div>
+    <div class="blend-btns">
+      <button data-mode="0">Replace</button>
+      <button data-mode="1" class="active">Alpha</button>
+      <button data-mode="2">Additive</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="slider-row">
+      <label>Opacity</label>
+      <input type="range" id="opacity" min="0" max="1" step="0.01" value="1">
+      <span class="val" id="opacityVal">1.00</span>
+    </div>
+    <div class="slider-row">
+      <label>Sensitivity</label>
+      <input type="range" id="sensitivity" min="0" max="1" step="0.01" value="0.7">
+      <span class="val" id="sensitivityVal">0.70</span>
+    </div>
+    <div class="slider-row">
+      <label>Attack</label>
+      <input type="range" id="attack" min="0.005" max="0.2" step="0.005" value="0.02">
+      <span class="val" id="attackVal">0.02</span>
+    </div>
+    <div class="slider-row">
+      <label>Decay</label>
+      <input type="range" id="decay" min="0.01" max="0.5" step="0.01" value="0.05">
+      <span class="val" id="decayVal">0.05</span>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="slider-row">
+      <label id="p0Label">Param 0</label>
+      <input type="range" id="p0" min="0" max="1" step="0.01" value="0">
+      <span class="val" id="p0Val">0.00</span>
+    </div>
+    <div class="slider-row">
+      <label id="p1Label">Param 1</label>
+      <input type="range" id="p1" min="0" max="1" step="0.01" value="0.45">
+      <span class="val" id="p1Val">0.45</span>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group-label">Audio Source</div>
+    <div class="audio-section">
+      <button id="micBtn">🎤 Mic</button>
+      <button id="fileBtn">📁 File</button>
+      <input type="file" id="fileInput" accept="audio/*">
+    </div>
+    <div class="meters">
+      <div class="meter">
+        <div class="meter-bar-wrap"><div class="meter-bar" id="bassMeter"></div></div>
+        <div class="meter-label">Bass</div>
+      </div>
+      <div class="meter">
+        <div class="meter-bar-wrap"><div class="meter-bar" id="midMeter"></div></div>
+        <div class="meter-label">Mid</div>
+      </div>
+      <div class="meter">
+        <div class="meter-bar-wrap"><div class="meter-bar" id="trebMeter"></div></div>
+        <div class="meter-label">Treb</div>
+      </div>
+    </div>
+    <div class="beat-row">
+      <span>Beat</span>
+      <div id="beatDot"></div>
+    </div>
+  </div>
+</div>
+
+<div id="error">
+  <h2>WebGPU Not Available</h2>
+  <p>This demo requires WebGPU. Please use Chrome 113+ or Edge 113+ with WebGPU enabled.</p>
+</div>
+
+<audio id="audioEl" crossorigin="anonymous" loop></audio>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// PALETTES
+// ═══════════════════════════════════════════════════════════════════════════
+const PALETTES = {
+  ember:     { a: [0.5, 0.2, 0.15],  b: [0.6, 0.35, 0.2],  c: [1, 1, 1], d: [0.0, 0.15, 0.25] },
+  ice:       { a: [0.2, 0.3, 0.45],  b: [0.3, 0.4, 0.5],   c: [1, 1, 1], d: [0.6, 0.55, 0.4] },
+  toxic:     { a: [0.15, 0.3, 0.15], b: [0.4, 0.55, 0.3],  c: [1, 1, 0.8], d: [0.1, 0.2, 0.05] },
+  vaporwave: { a: [0.55, 0.4, 0.55], b: [0.45, 0.3, 0.5],  c: [1, 1, 1], d: [0.3, 0.55, 0.8] },
+  mono:      { a: [0.6, 0.6, 0.6],   b: [0.4, 0.4, 0.4],   c: [1, 1, 1], d: [0.0, 0.05, 0.1] },
+  stone:     { a: [0.34, 0.30, 0.26], b: [0.22, 0.20, 0.17], c: [1, 1, 1], d: [0.05, 0.10, 0.15] },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PRESETS
+// ═══════════════════════════════════════════════════════════════════════════
+const PRESETS = {
+  tunnel: {
+    label: 'Stony Cave Tunnel',
+    palette: 'stone',
+    params: [
+      { label: 'Rock tint', slot: 'p0', default: 0.0 },
+      { label: 'Facet count', slot: 'p1', default: 0.45 },
+    ],
+    body: `
+fn render(uv: vec2f, p: vec2f) -> vec3f {
+  let t = u_time();
+  let react = u_react();
+  let beat = u_beat();
+  let angle = atan2(p.y, p.x);
+  let radius = length(p);
+  let invR = 1.0 / (radius + 0.001);
+  let speed = 0.5 + beat * 0.3 * react;
+  let tu = angle / 3.14159265 * 0.5 + 0.5;
+  let tv = invR * 0.5 + t * speed;
+  let blocks = 4.0 + u_p1() * 16.0;
+  let blockUv = floor(vec2f(tu * blocks * 2.0, tv * blocks)) / blocks;
+  let n = hash11(dot(blockUv, vec2f(127.1, 311.7)));
+  let n2 = fbm(blockUv * 3.0 + vec2f(t * 0.1, 0.0));
+  let depth = clamp(invR * 0.3, 0.0, 1.0);
+  let fracUv = fract(vec2f(tu * blocks * 2.0, tv * blocks));
+  let crevice = smoothstep(0.0, 0.08, min(fracUv.x, fracUv.y)) *
+                smoothstep(0.0, 0.08, min(1.0 - fracUv.x, 1.0 - fracUv.y));
+  let col = palette(n * 0.5 + depth * 0.3 + u_p0() * 0.4);
+  let edge = smoothstep(0.0, 0.25, radius);
+  let shade = depth * (0.5 + n2 * 0.5) * edge * crevice;
+  let torchRadius = smoothstep(0.6, 0.0, radius);
+  let torch = palette(0.05) * torchRadius * beat * react * 1.5;
+  let fog = smoothstep(0.8, 0.0, depth);
+  return col * shade * fog + torch;
+}
+`,
+  },
+  warp: {
+    label: 'Star Warp',
+    palette: 'ice',
+    params: [
+      { label: 'Star hue', slot: 'p0', default: 0.5 },
+      { label: 'Density', slot: 'p1', default: 0.6 },
+    ],
+    body: `
+fn starLayer(coord: vec2f, scale: f32, t: f32) -> f32 {
+  let uv = coord * scale;
+  let id = floor(uv);
+  let gv = fract(uv) - 0.5;
+  let rnd = hash11(dot(id, vec2f(127.1, 311.7)));
+  let offset = vec2f(rnd - 0.5, fract(rnd * 43.0) - 0.5) * 0.7;
+  let d = length(gv - offset);
+  let twinkle = sin(t * (rnd * 3.0 + 1.0) + rnd * 6.28) * 0.5 + 0.5;
+  let star = smoothstep(0.04 + twinkle * 0.02, 0.0, d);
+  return star;
+}
+
+fn render(uv: vec2f, p: vec2f) -> vec3f {
+  let t = u_time();
+  let react = u_react();
+  let beat = u_beat();
+  let warpSpeed = 1.0 + beat * react * 2.0;
+  let flowT = t * warpSpeed;
+  let density = 8.0 + u_p1() * 25.0;
+  let r = length(p);
+  var sp = p * (1.0 + r * 0.3 * (1.0 + beat * react * 0.5));
+  var stars = 0.0;
+  var colorMix = 0.0;
+  for (var i = 0; i < 5; i = i + 1) {
+    let fi = f32(i);
+    let layerScale = density * (1.0 + fi * 0.7);
+    let layerT = flowT * (1.0 + fi * 0.3);
+    let scroll = vec2f(0.0, layerT * 0.4);
+    let s = starLayer(sp + scroll, layerScale, layerT);
+    let depthV = 1.0 - fi * 0.15;
+    stars = stars + s * depthV;
+    colorMix = colorMix + s * fi * 0.2;
+  }
+  let streak = smoothstep(0.4, 0.0, abs(p.x * 0.6)) *
+               smoothstep(1.8, 0.0, r) *
+               beat * react * 0.6;
+  let col = palette(u_p0() + colorMix * 0.3 + r * 0.2);
+  let base = col * stars + palette(u_p0() + 0.2) * streak;
+  return base;
+}
+`,
+  },
+  clouds: {
+    label: 'Cloud Flight',
+    palette: 'vaporwave',
+    params: [
+      { label: 'Hue shift', slot: 'p0', default: 0.0 },
+      { label: 'Scale', slot: 'p1', default: 0.5 },
+    ],
+    body: `
+fn cloudDensity(coord: vec2f, t: f32, coverage: f32) -> f32 {
+  let n = fbm(coord * 2.0 + vec2f(t * 0.1, t * 0.05));
+  return smoothstep(coverage, coverage + 0.3, n);
+}
+
+fn render(uv: vec2f, p: vec2f) -> vec3f {
+  let t = u_time();
+  let react = u_react();
+  let beat = u_beat();
+  let energy = u_bass() + u_mid() * 0.5;
+  let coverage = 0.3 + u_p1() * 0.4;
+  let hue = u_p0();
+  let scroll = vec2f(t * 0.3, t * 0.15);
+  var density = 0.0;
+  var colorT = 0.0;
+  for (var layer = 0; layer < 3; layer = layer + 1) {
+    let fl = f32(layer);
+    let scale = 1.0 + fl * 0.6;
+    let layerP = p * scale + scroll * (1.0 + fl * 0.4);
+    let d = cloudDensity(layerP, t + fl * 10.0, coverage - energy * 0.1 * react);
+    let depthV = 1.0 - fl * 0.25;
+    density = density + d * depthV;
+    colorT = colorT + d * fl * 0.3;
+  }
+  density = clamp(density, 0.0, 1.0);
+  let sky = mix(vec3f(0.02, 0.01, 0.05), vec3f(0.1, 0.05, 0.15), uv.y);
+  let cloudCol = palette(hue + colorT + energy * react * 0.15 + uv.x * 0.2);
+  let glow = palette(hue + 0.5 + beat * 0.3) * beat * react * 0.4 * density;
+  let col = mix(sky, cloudCol, density) + glow;
+  return col;
+}
+`,
+  },
+  volumetric: {
+    label: 'Volumetric Clouds',
+    palette: 'mono',
+    params: [
+      { label: 'Density', slot: 'p0', default: 0.6 },
+      { label: 'Light angle', slot: 'p1', default: 0.3 },
+    ],
+    body: `
+fn render(uv: vec2f, p: vec2f) -> vec3f {
+  let t = u_time();
+  let react = u_react();
+  let ro = vec3f(0.0, 1.0 + u_bass() * 0.3 * react, -3.0 + t * 0.3);
+  let rd = normalize(vec3f(p.x, p.y * 0.8 + 0.2, 1.5));
+  let lightDir = normalize(vec3f(cos(u_p1() * 6.28), 0.6, sin(u_p1() * 6.28)));
+  var density = 0.0;
+  var light = 0.0;
+  var depth = 0.0;
+  for (var i = 0; i < 40; i = i + 1) {
+    let pos = ro + rd * depth;
+    let n = fbm(pos.xz * 0.3 + vec2f(t * 0.05, 0.0)) * (1.0 + u_bass() * 0.4 * react);
+    let cloudH = pos.y - (2.0 + n * 3.0);
+    let d = max(0.0, -cloudH * u_p0());
+    if (d > 0.01) {
+      density = density + d * 0.08;
+      let lightSample = fbm((pos.xz + lightDir.xz * 0.5) * 0.3);
+      light = light + max(0.0, 1.0 - lightSample) * d * 0.04;
+    }
+    depth = depth + max(0.3, depth * 0.04);
+    if (density > 1.0 || depth > 30.0) { break; }
+  }
+  density = min(density, 1.0);
+  let skyCol = palette(0.7 + p.y * 0.1);
+  let cloudCol = palette(0.1 + light * 0.3) * (0.5 + light * 1.5);
+  let flash = u_treb() * react * smoothstep(0.5, 1.0, u_treb()) * 3.0;
+  let col = mix(skyCol, cloudCol + vec3f(flash), density);
+  let horizonGlow = palette(0.4) * u_beat() * 0.3 * smoothstep(0.3, 0.0, abs(p.y));
+  return col + horizonGlow;
+}
+`,
+  },
+  storm: {
+    label: 'Storm Clouds',
+    palette: 'ember',
+    params: [
+      { label: 'Turbulence', slot: 'p0', default: 0.7 },
+      { label: 'Flash rate', slot: 'p1', default: 0.5 },
+    ],
+    body: `
+fn render(uv: vec2f, p: vec2f) -> vec3f {
+  let t = u_time();
+  let react = u_react();
+  let turb = 1.0 + u_p0() * 3.0;
+  let flow = vec2f(t * 0.08, t * 0.03);
+  let q = p * 1.5 + flow;
+  let w1 = fbm(q * turb + flow * 0.5);
+  let w2 = fbm(q * turb * 0.7 - flow);
+  let storm = fbm(q * 2.0 + vec2f(w1, w2) * 1.5);
+  let dark = smoothstep(0.3, 0.8, storm);
+  var col = palette(0.05 + storm * 0.15) * (0.1 + dark * 0.3);
+  let underlight = smoothstep(0.0, -0.5, p.y) * (0.3 + u_bass() * 0.5 * react);
+  col = col + palette(0.0) * underlight * 0.6;
+  let flashChance = u_p1();
+  let lightning = u_beat() * step(hash11(floor(t * 4.0)), flashChance);
+  let branch = smoothstep(0.48, 0.5, fbm(p * 8.0 + t * 2.0));
+  col = col + vec3f(0.9, 0.85, 1.0) * lightning * branch * 4.0;
+  col = col + palette(0.6) * u_treb() * react * dark * 0.2;
+  return col;
+}
+`,
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WGSL CODE
+// ═══════════════════════════════════════════════════════════════════════════
+const SHADER_PRELUDE = `
+struct U {
+  a: vec4f,
+  b: vec4f,
+  c: vec4f,
+  d: vec4f,
+  pa: vec4f,
+  pb: vec4f,
+  pc: vec4f,
+  pd: vec4f,
+};
+
+@group(0) @binding(0) var<uniform> u: U;
+
+fn u_time() -> f32       { return u.a.x; }
+fn u_energy() -> f32     { return u.a.y; }
+fn u_beat() -> f32       { return u.a.z; }
+fn u_react() -> f32      { return u.a.w; }
+fn u_bass() -> f32       { return u.b.x; }
+fn u_mid() -> f32        { return u.b.y; }
+fn u_treb() -> f32       { return u.b.z; }
+fn u_sensitivity() -> f32{ return u.b.w; }
+fn u_resolution() -> vec2f { return u.c.xy; }
+fn u_p0() -> f32         { return u.c.z; }
+fn u_p1() -> f32         { return u.c.w; }
+fn u_opacity() -> f32    { return u.d.x; }
+fn u_blendMode() -> f32  { return u.d.y; }
+
+fn palette(t: f32) -> vec3f {
+  let a = u.pa.xyz;
+  let b = u.pb.xyz;
+  let c = u.pc.xyz;
+  let d = u.pd.xyz;
+  return a + b * cos(6.28318530718 * (c * t + d));
+}
+
+fn hash11(p: f32) -> f32 {
+  var p3 = fract(p * 0.1031);
+  p3 *= p3 + 33.33;
+  p3 *= p3 + p3;
+  return fract(p3);
+}
+
+fn hash21(p: vec2f) -> f32 {
+  var p3 = fract(vec3f(p.x, p.y, p.x) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+fn hash22(p: vec2f) -> vec2f {
+  let n = vec3f(dot(p, vec2f(127.1, 311.7)),
+                dot(p, vec2f(269.5, 183.3)),
+                dot(p, vec2f(419.2, 371.9)));
+  return fract(sin(n.xy) * 43758.5453);
+}
+
+fn noise(p: vec2f) -> f32 {
+  let i = floor(p);
+  let f = fract(p);
+  let u2 = f * f * (3.0 - 2.0 * f);
+  let a = hash21(i);
+  let b = hash21(i + vec2f(1.0, 0.0));
+  let c = hash21(i + vec2f(0.0, 1.0));
+  let d = hash21(i + vec2f(1.0, 1.0));
+  return mix(mix(a, b, u2.x), mix(c, d, u2.x), u2.y);
+}
+
+fn fbm(p_in: vec2f) -> f32 {
+  var p = p_in;
+  var value = 0.0;
+  var amplitude = 0.5;
+  for (var i = 0; i < 5; i++) {
+    value += amplitude * noise(p);
+    p *= 2.0;
+    amplitude *= 0.5;
+  }
+  return value;
+}
+`;
+
+const SHADER_EPILOGUE = `
+struct VertexOutput {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
+};
+
+@vertex
+fn vs_main(@builtin(vertex_index) idx: u32) -> VertexOutput {
+  var pos = array<vec2f, 3>(
+    vec2f(-1.0, -1.0),
+    vec2f( 3.0, -1.0),
+    vec2f(-1.0,  3.0),
+  );
+  var out: VertexOutput;
+  out.position = vec4f(pos[idx], 0.0, 1.0);
+  out.uv = pos[idx] * 0.5 + 0.5;
+  out.uv.y = 1.0 - out.uv.y;
+  return out;
+}
+
+@fragment
+fn fs_main(input: VertexOutput) -> @location(0) vec4f {
+  let res = u_resolution();
+  let aspect = res.x / res.y;
+  let uv = input.uv;
+  let p = (uv - 0.5) * vec2f(aspect, 1.0);
+  let raw = render(uv, p);
+  let mapped = raw / (raw + vec3f(1.0));
+  let gamma = pow(mapped, vec3f(1.0 / 2.2));
+  return vec4f(gamma, u_opacity());
+}
+`;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════
+let device, context, pipeline, uniformBuffer, bindGroup;
+let currentPresetId = 'tunnel';
+let currentPaletteId = 'stone';
+let blendMode = 1; // 0=replace, 1=alpha, 2=additive
+let opacity = 1.0, sensitivity = 0.7, attack = 0.02, decay = 0.05, p0 = 0, p1 = 0.45;
+let startTime = performance.now() / 1000;
+
+// Audio state
+let audioCtx, analyser, freqData;
+let bass = 0, mid = 0, treb = 0, energy = 0;
+let smoothBass = 0, smoothMid = 0, smoothTreb = 0, smoothEnergy = 0;
+let beatValue = 0;
+let lastBassForBeat = 0;
+let micStream = null;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════
+async function init() {
+  if (!navigator.gpu) {
+    document.getElementById('error').style.display = 'block';
+    return;
+  }
+
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) {
+    document.getElementById('error').style.display = 'block';
+    return;
+  }
+
+  device = await adapter.requestDevice();
+  const canvas = document.getElementById('c');
+  context = canvas.getContext('webgpu');
+
+  const format = navigator.gpu.getPreferredCanvasFormat();
+  context.configure({ device, format, alphaMode: 'premultiplied' });
+
+  uniformBuffer = device.createBuffer({
+    size: 128, // 8 x vec4f
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  await buildPipeline(format);
+  setupUI();
+  requestAnimationFrame(frame);
+}
+
+async function buildPipeline(format) {
+  const preset = PRESETS[currentPresetId];
+  const shaderCode = SHADER_PRELUDE + preset.body + SHADER_EPILOGUE;
+
+  let shaderModule;
+  try {
+    shaderModule = device.createShaderModule({ code: shaderCode });
+    const info = await shaderModule.getCompilationInfo();
+    const errors = info.messages.filter(m => m.type === 'error');
+    if (errors.length > 0) {
+      console.error('Shader errors:', errors);
+      return;
+    }
+  } catch (e) {
+    console.error('Shader compilation failed:', e);
+    return;
+  }
+
+  const bindGroupLayout = device.createBindGroupLayout({
+    entries: [{
+      binding: 0,
+      visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+      buffer: { type: 'uniform' },
+    }],
+  });
+
+  const pipelineLayout = device.createPipelineLayout({
+    bindGroupLayouts: [bindGroupLayout],
+  });
+
+  format = format || navigator.gpu.getPreferredCanvasFormat();
+
+  pipeline = device.createRenderPipeline({
+    layout: pipelineLayout,
+    vertex: { module: shaderModule, entryPoint: 'vs_main' },
+    fragment: {
+      module: shaderModule,
+      entryPoint: 'fs_main',
+      targets: [{ format }],
+    },
+    primitive: { topology: 'triangle-list' },
+  });
+
+  bindGroup = device.createBindGroup({
+    layout: bindGroupLayout,
+    entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUDIO
+// ═══════════════════════════════════════════════════════════════════════════
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new AudioContext();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.6;
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+  }
+}
+
+function analyzeAudio() {
+  if (!analyser || !freqData) return;
+  analyser.getByteFrequencyData(freqData);
+  const len = freqData.length;
+  const bassEnd = Math.floor(len * 0.1);
+  const midEnd = Math.floor(len * 0.4);
+
+  let bSum = 0, mSum = 0, tSum = 0;
+  for (let i = 0; i < bassEnd; i++) bSum += freqData[i];
+  for (let i = bassEnd; i < midEnd; i++) mSum += freqData[i];
+  for (let i = midEnd; i < len; i++) tSum += freqData[i];
+
+  bass = bSum / (bassEnd * 255);
+  mid = mSum / ((midEnd - bassEnd) * 255);
+  treb = tSum / ((len - midEnd) * 255);
+  energy = (bass + mid + treb) / 3;
+}
+
+async function toggleMic() {
+  ensureAudioCtx();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+  if (micStream) {
+    micStream.getTracks().forEach(t => t.stop());
+    micStream = null;
+    document.getElementById('micBtn').classList.remove('active');
+    return;
+  }
+
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const source = audioCtx.createMediaStreamSource(micStream);
+    source.connect(analyser);
+    document.getElementById('micBtn').classList.add('active');
+  } catch (e) {
+    console.warn('Mic access denied:', e);
+  }
+}
+
+function loadAudioFile(file) {
+  ensureAudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const audioEl = document.getElementById('audioEl');
+  audioEl.src = URL.createObjectURL(file);
+  audioEl.play();
+
+  // Disconnect mic if active
+  if (micStream) {
+    micStream.getTracks().forEach(t => t.stop());
+    micStream = null;
+    document.getElementById('micBtn').classList.remove('active');
+  }
+
+  const source = audioCtx.createMediaElementSource(audioEl);
+  source.connect(analyser);
+  analyser.connect(audioCtx.destination);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FRAME LOOP
+// ═══════════════════════════════════════════════════════════════════════════
+let lastFrameTime = performance.now() / 1000;
+
+function frame() {
+  if (!pipeline) { requestAnimationFrame(frame); return; }
+
+  const now = performance.now() / 1000;
+  const dt = Math.min(now - lastFrameTime, 0.1);
+  lastFrameTime = now;
+  const time = now - startTime;
+
+  // Analyze audio
+  analyzeAudio();
+
+  // Smooth audio with attack/decay
+  const bassTarget = bass * sensitivity;
+  const midTarget = mid * sensitivity;
+  const trebTarget = treb * sensitivity;
+  const energyTarget = energy * sensitivity;
+
+  const aFactor = 1 - Math.exp(-dt / attack);
+  const dFactor = 1 - Math.exp(-dt / decay);
+
+  smoothBass += (bassTarget > smoothBass ? aFactor : dFactor) * (bassTarget - smoothBass);
+  smoothMid += (midTarget > smoothMid ? aFactor : dFactor) * (midTarget - smoothMid);
+  smoothTreb += (trebTarget > smoothTreb ? aFactor : dFactor) * (trebTarget - smoothTreb);
+  smoothEnergy += (energyTarget > smoothEnergy ? aFactor : dFactor) * (energyTarget - smoothEnergy);
+
+  // Beat detection
+  const beatThreshold = 0.15;
+  if (smoothBass - lastBassForBeat > beatThreshold && beatValue < 0.3) {
+    beatValue = 1.0;
+  }
+  lastBassForBeat = smoothBass;
+  beatValue *= Math.pow(0.1, dt / (decay * 7));
+  if (beatValue < 0.01) beatValue = 0;
+
+  // Update UI meters
+  document.getElementById('bassMeter').style.height = (smoothBass * 100) + '%';
+  document.getElementById('midMeter').style.height = (smoothMid * 100) + '%';
+  document.getElementById('trebMeter').style.height = (smoothTreb * 100) + '%';
+  const beatDot = document.getElementById('beatDot');
+  if (beatValue > 0.3) beatDot.classList.add('flash');
+  else beatDot.classList.remove('flash');
+
+  // Resize canvas
+  const canvas = document.getElementById('c');
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.floor(canvas.clientWidth * dpr);
+  const h = Math.floor(canvas.clientHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+
+  // Write uniform buffer
+  const pal = PALETTES[currentPaletteId];
+  const data = new Float32Array(32);
+  // a: time, energy, beat, reactivity
+  data[0] = time; data[1] = smoothEnergy; data[2] = beatValue; data[3] = sensitivity;
+  // b: bass, mid, treb, sensitivity
+  data[4] = smoothBass; data[5] = smoothMid; data[6] = smoothTreb; data[7] = sensitivity;
+  // c: resX, resY, p0, p1
+  data[8] = w; data[9] = h; data[10] = p0; data[11] = p1;
+  // d: opacity, blendMode, pad, pad
+  data[12] = opacity; data[13] = blendMode; data[14] = 0; data[15] = 0;
+  // pa: palette a
+  data[16] = pal.a[0]; data[17] = pal.a[1]; data[18] = pal.a[2]; data[19] = 0;
+  // pb: palette b
+  data[20] = pal.b[0]; data[21] = pal.b[1]; data[22] = pal.b[2]; data[23] = 0;
+  // pc: palette c
+  data[24] = pal.c[0]; data[25] = pal.c[1]; data[26] = pal.c[2]; data[27] = 0;
+  // pd: palette d
+  data[28] = pal.d[0]; data[29] = pal.d[1]; data[30] = pal.d[2]; data[31] = 0;
+
+  device.queue.writeBuffer(uniformBuffer, 0, data);
+
+  // Render
+  const encoder = device.createCommandEncoder();
+  const pass = encoder.beginRenderPass({
+    colorAttachments: [{
+      view: context.getCurrentTexture().createView(),
+      loadOp: 'clear',
+      storeOp: 'store',
+      clearValue: { r: 0, g: 0, b: 0, a: 1 },
+    }],
+  });
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, bindGroup);
+  pass.draw(3);
+  pass.end();
+  device.queue.submit([encoder.finish()]);
+
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UI SETUP
+// ═══════════════════════════════════════════════════════════════════════════
+function setupUI() {
+  const presetSel = document.getElementById('presetSel');
+  const paletteSel = document.getElementById('paletteSel');
+
+  presetSel.value = currentPresetId;
+  paletteSel.value = currentPaletteId;
+
+  presetSel.addEventListener('change', async () => {
+    currentPresetId = presetSel.value;
+    const preset = PRESETS[currentPresetId];
+    // Update palette to preset default
+    currentPaletteId = preset.palette;
+    paletteSel.value = currentPaletteId;
+    // Update param labels and defaults
+    updateParamUI(preset);
+    await buildPipeline();
+  });
+
+  paletteSel.addEventListener('change', () => {
+    currentPaletteId = paletteSel.value;
+  });
+
+  // Blend mode buttons
+  document.querySelectorAll('.blend-btns button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.blend-btns button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      blendMode = parseInt(btn.dataset.mode);
+    });
+  });
+
+  // Sliders
+  const sliderSetup = (id, setter) => {
+    const el = document.getElementById(id);
+    const val = document.getElementById(id + 'Val');
+    el.addEventListener('input', () => {
+      const v = parseFloat(el.value);
+      setter(v);
+      if (val) val.textContent = v.toFixed(2);
+    });
+  };
+
+  sliderSetup('opacity', v => { opacity = v; });
+  sliderSetup('sensitivity', v => { sensitivity = v; });
+  sliderSetup('attack', v => { attack = v; });
+  sliderSetup('decay', v => { decay = v; });
+  sliderSetup('p0', v => { p0 = v; });
+  sliderSetup('p1', v => { p1 = v; });
+
+  // Audio
+  document.getElementById('micBtn').addEventListener('click', toggleMic);
+  document.getElementById('fileBtn').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+  });
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    if (e.target.files[0]) loadAudioFile(e.target.files[0]);
+  });
+
+  // Set initial param labels
+  updateParamUI(PRESETS[currentPresetId]);
+}
+
+function updateParamUI(preset) {
+  const p0Param = preset.params.find(p => p.slot === 'p0');
+  const p1Param = preset.params.find(p => p.slot === 'p1');
+
+  if (p0Param) {
+    document.getElementById('p0Label').textContent = p0Param.label;
+    const el = document.getElementById('p0');
+    el.value = p0Param.default;
+    p0 = p0Param.default;
+    document.getElementById('p0Val').textContent = p0Param.default.toFixed(2);
+  }
+  if (p1Param) {
+    document.getElementById('p1Label').textContent = p1Param.label;
+    const el = document.getElementById('p1');
+    el.value = p1Param.default;
+    p1 = p1Param.default;
+    document.getElementById('p1Val').textContent = p1Param.default.toFixed(2);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GO
+// ═══════════════════════════════════════════════════════════════════════════
+init();
+</script>
+</body>
+</html>
