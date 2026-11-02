@@ -82,11 +82,11 @@ fn noise(p: vec2f) -> f32 {
   return mix(mix(a, b, u2.x), mix(c, d, u2.x), u2.y);
 }
 
-fn fbm(p_in: vec2f, octaves: i32) -> f32 {
+fn fbm(p_in: vec2f) -> f32 {
   var p = p_in;
   var value = 0.0;
   var amplitude = 0.5;
-  for (var i = 0; i < octaves; i++) {
+  for (var i = 0; i < 4; i++) {
     value += amplitude * noise(p);
     p *= 2.0;
     amplitude *= 0.5;

@@ -5,19 +5,21 @@
 
 import type { ShaderPreset } from '../types';
 import { TUNNEL_PRESET } from './tunnel';
-import { STAR_WARP_PRESET } from './starWarp';
+import { RAIN_PRESET } from './rain';
 import { CLOUD_FLIGHT_PRESET } from './cloudFlight';
 import { VOLUMETRIC_CLOUDS_PRESET } from './volumetricClouds';
 import { STORM_CLOUDS_PRESET } from './stormClouds';
+import { PROTEAN_CLOUDS_PRESET } from './proteanClouds';
 
 // ─── Presets ────────────────────────────────────────────────
 
 export const PRESETS: ShaderPreset[] = [
   TUNNEL_PRESET,
-  STAR_WARP_PRESET,
+  RAIN_PRESET,
   CLOUD_FLIGHT_PRESET,
   VOLUMETRIC_CLOUDS_PRESET,
   STORM_CLOUDS_PRESET,
+  PROTEAN_CLOUDS_PRESET,
 ];
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -30,7 +32,8 @@ export function getPresetById(id: string): ShaderPreset | undefined {
 
 export { PALETTES, getPaletteById } from './palettes';
 export { TUNNEL_PRESET } from './tunnel';
-export { STAR_WARP_PRESET } from './starWarp';
+export { RAIN_PRESET } from './rain';
 export { CLOUD_FLIGHT_PRESET } from './cloudFlight';
 export { VOLUMETRIC_CLOUDS_PRESET } from './volumetricClouds';
 export { STORM_CLOUDS_PRESET } from './stormClouds';
+export { PROTEAN_CLOUDS_PRESET } from './proteanClouds';

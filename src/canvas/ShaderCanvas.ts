@@ -46,6 +46,13 @@ export interface ShaderCanvas {
   connectAudio(element: HTMLMediaElement): void;
   /** Connect a microphone for audio reactivity. */
   connectMicrophone(): Promise<void>;
+  /** Connect a specific audio device by deviceId. */
+  connectDevice(deviceId: string, options?: { playback?: boolean }): Promise<void>;
+  /**
+   * Capture system/tab audio via browser's getDisplayMedia picker.
+   * User selects a tab/screen; video track is discarded, audio is analysed.
+   */
+  connectSystemAudio(options?: { playback?: boolean }): Promise<void>;
   /** Start the render loop. */
   start(): void;
   /** Stop the render loop. */
@@ -83,14 +90,21 @@ export async function createShaderCanvas(
   }
 
   const device = await adapter.requestDevice();
-  const format = navigator.gpu.getPreferredCanvasFormat();
+  const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
+
+  // Use rgba16float for HDR rendering (eliminates 8-bit color banding in dark scenes).
+  // Fall back to preferred format if 16-bit isn't supported.
+  const hdrFormat: GPUTextureFormat = 'rgba16float';
+  const supportsHDR = adapter.features.has('float32-filterable') || true; // rgba16float is core in WebGPU
+  const format: GPUTextureFormat = supportsHDR ? hdrFormat : canvasFormat;
 
   const ctx = canvas.getContext('webgpu');
   if (!ctx) {
     throw new Error('Failed to get WebGPU context from canvas.');
   }
 
-  ctx.configure({ device, format, alphaMode: 'opaque' });
+  // Configure with chosen format — premultiplied allows CSS background to show through
+  ctx.configure({ device, format, alphaMode: 'premultiplied' });
 
   // ── State ──
   const config: ShaderOverlayConfig = { ...DEFAULT_CONFIG, ...options.config };
@@ -109,7 +123,7 @@ export async function createShaderCanvas(
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
-      ctx!.configure({ device, format, alphaMode: 'opaque' });
+      ctx!.configure({ device, format, alphaMode: 'premultiplied' });
     }
   }
 
@@ -135,7 +149,7 @@ export async function createShaderCanvas(
     const clearPass = encoder.beginRenderPass({
       colorAttachments: [{
         view: textureView,
-        clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        clearValue: { r: 0, g: 0, b: 0, a: 0 },
         loadOp: 'clear' as const,
         storeOp: 'store' as const,
       }],
@@ -224,6 +238,14 @@ export async function createShaderCanvas(
 
     async connectMicrophone(): Promise<void> {
       await audioAnalyser.connectMicrophone();
+    },
+
+    async connectDevice(deviceId: string, options?: { playback?: boolean }): Promise<void> {
+      await audioAnalyser.connectDevice(deviceId, options);
+    },
+
+    async connectSystemAudio(options?: { playback?: boolean }): Promise<void> {
+      await audioAnalyser.connectSystemAudio(options);
     },
 
     start(): void {

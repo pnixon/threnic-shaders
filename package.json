@@ -8,19 +8,19 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     },
     "./presets": {
+      "types": "./dist/presets.d.ts",
       "import": "./dist/presets.js",
-      "require": "./dist/presets.cjs",
-      "types": "./dist/presets.d.ts"
+      "require": "./dist/presets.cjs"
     },
     "./palettes": {
+      "types": "./dist/palettes.d.ts",
       "import": "./dist/palettes.js",
-      "require": "./dist/palettes.cjs",
-      "types": "./dist/palettes.d.ts"
+      "require": "./dist/palettes.cjs"
     }
   },
   "files": [
@@ -29,6 +29,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "dev": "vite",
     "build": "tsup",
     "test": "vitest",
     "test:run": "vitest run",

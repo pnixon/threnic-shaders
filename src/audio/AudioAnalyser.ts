@@ -3,6 +3,13 @@
  *
  * Extracts bass/mid/high/energy bands from an audio source and provides
  * smoothed values suitable for driving shader uniforms.
+ *
+ * Supported sources:
+ *   - HTMLMediaElement (audio/video element)
+ *   - Microphone (getUserMedia)
+ *   - Specific input/output device by deviceId (getUserMedia)
+ *   - System audio / desktop loopback (getDisplayMedia with audio)
+ *   - Any MediaStream directly
  */
 
 export interface AudioBands {
@@ -19,9 +26,16 @@ export interface AudioAnalyserOptions {
   smoothing?: number;
 }
 
+/** Device info returned by listDevices() */
+export interface AudioDeviceInfo {
+  deviceId: string;
+  label: string;
+  kind: 'audioinput' | 'audiooutput';
+}
+
 /**
  * Lightweight audio analyser that extracts frequency bands.
- * Connect to any audio source (HTMLAudioElement, MediaStream, AudioBufferSource).
+ * Connect to any audio source (HTMLAudioElement, MediaStream, system audio, specific device).
  */
 export class AudioAnalyser {
   private ctx: AudioContext | null = null;
@@ -29,6 +43,9 @@ export class AudioAnalyser {
   private source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null = null;
   private freqData: Uint8Array<ArrayBuffer> | null = null;
   private sampleRate = 44100;
+
+  // Hold references to streams so we can stop tracks on disconnect
+  private _activeStream: MediaStream | null = null;
 
   // Smoothed output values
   private _bass = 0;
@@ -45,15 +62,15 @@ export class AudioAnalyser {
     };
   }
 
-  // ─── Connection ─────────────────────────────────────────────
+  // ─── Connection Methods ─────────────────────────────────────
 
   /**
    * Connect to an HTMLAudioElement or HTMLVideoElement.
-   * The element's audio will be routed through the analyser.
+   * The element's audio will be routed through the analyser AND to speakers.
    */
   connectElement(element: HTMLMediaElement): void {
+    this.disconnect();
     this.ensureContext();
-    if (this.source) this.source.disconnect();
 
     this.source = this.ctx!.createMediaElementSource(element);
     this.source.connect(this.analyser!);
@@ -61,24 +78,112 @@ export class AudioAnalyser {
   }
 
   /**
-   * Connect to a MediaStream (e.g. microphone).
-   * Does NOT route to destination (avoids feedback).
+   * Connect to a raw MediaStream.
+   * Does NOT route to destination (avoids feedback for mic/loopback).
+   * Pass `playback: true` to also hear the audio.
    */
-  connectStream(stream: MediaStream): void {
+  connectStream(stream: MediaStream, options?: { playback?: boolean }): void {
+    this.disconnect();
     this.ensureContext();
-    if (this.source) this.source.disconnect();
 
+    this._activeStream = stream;
     this.source = this.ctx!.createMediaStreamSource(stream);
     this.source.connect(this.analyser!);
-    // Note: NOT connecting to destination to avoid mic feedback
+
+    if (options?.playback) {
+      this.analyser!.connect(this.ctx!.destination);
+    }
   }
 
   /**
-   * Connect to a microphone. Requests permission and connects the stream.
+   * Connect to the default microphone. Requests permission.
    */
   async connectMicrophone(): Promise<void> {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     this.connectStream(stream);
+  }
+
+  /**
+   * Connect to a specific audio device by deviceId.
+   *
+   * Works for input devices (microphones, line-in, virtual cables like VB-Audio).
+   * For output device loopback on Windows, use a virtual audio cable that mirrors
+   * system output as an input device, then pass that device's ID here.
+   *
+   * @param deviceId - The deviceId from enumerateDevices() or listDevices()
+   * @param playback - Whether to route audio to speakers (default: false)
+   */
+  async connectDevice(deviceId: string, options?: { playback?: boolean }): Promise<void> {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        deviceId: { exact: deviceId },
+        // Disable processing for cleanest signal
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+    });
+    this.connectStream(stream, options);
+  }
+
+  /**
+   * Capture system/desktop audio via getDisplayMedia.
+   *
+   * This triggers the browser's native screen/tab picker where the user can
+   * select a Chrome tab (with its audio), entire screen, or window.
+   * The video track is immediately stopped — only audio is kept.
+   *
+   * NOTE: This is the most reliable way to capture "what's playing" without
+   * needing a virtual audio cable. Works in Chrome/Edge. Firefox support varies.
+   *
+   * @param playback - Whether to also play the captured audio through speakers (default: false)
+   */
+  async connectSystemAudio(options?: { playback?: boolean }): Promise<void> {
+    // getDisplayMedia with audio captures system/tab audio
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      audio: true,
+      video: true, // Required by spec, but we discard it immediately
+    });
+
+    // Stop all video tracks — we only need audio
+    for (const track of stream.getVideoTracks()) {
+      track.stop();
+      stream.removeTrack(track);
+    }
+
+    // Verify we got audio tracks
+    if (stream.getAudioTracks().length === 0) {
+      stream.getTracks().forEach((t) => t.stop());
+      throw new Error(
+        'No audio track captured. Make sure you selected a tab/screen with audio playing, ' +
+        'and checked "Share audio" in the picker dialog.',
+      );
+    }
+
+    this.connectStream(stream, options);
+  }
+
+  // ─── Device Enumeration ─────────────────────────────────────
+
+  /**
+   * List available audio input and output devices.
+   * Requires user gesture / prior permission for labels to be populated.
+   *
+   * Tip: Output devices appear as 'audiooutput'. To capture system audio on Windows
+   * without getDisplayMedia, use a virtual audio cable (VB-Audio, Voicemeeter)
+   * that mirrors system output as an input device — it will appear as 'audioinput'.
+   */
+  static async listDevices(): Promise<AudioDeviceInfo[]> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices
+      .filter((d): d is MediaDeviceInfo & { kind: 'audioinput' | 'audiooutput' } =>
+        d.kind === 'audioinput' || d.kind === 'audiooutput',
+      )
+      .map((d) => ({
+        deviceId: d.deviceId,
+        label: d.label || `${d.kind === 'audioinput' ? 'Input' : 'Output'} ${d.deviceId.slice(0, 8)}`,
+        kind: d.kind,
+      }));
   }
 
   // ─── Analysis ───────────────────────────────────────────────
@@ -129,13 +234,37 @@ export class AudioAnalyser {
   // ─── Cleanup ────────────────────────────────────────────────
 
   /**
-   * Disconnect and release audio resources.
+   * Disconnect the current source without destroying the context.
+   * Call before connecting a new source.
    */
-  destroy(): void {
+  disconnect(): void {
     if (this.source) {
       this.source.disconnect();
       this.source = null;
     }
+    // Stop any active stream tracks (mic/system)
+    if (this._activeStream) {
+      for (const track of this._activeStream.getTracks()) {
+        track.stop();
+      }
+      this._activeStream = null;
+    }
+    // Disconnect analyser from destination (if connected)
+    if (this.analyser) {
+      try { this.analyser.disconnect(); } catch { /* may not be connected */ }
+    }
+    // Reset smoothed values
+    this._bass = 0;
+    this._mid = 0;
+    this._high = 0;
+    this._energy = 0;
+  }
+
+  /**
+   * Disconnect and release ALL audio resources (context, analyser, streams).
+   */
+  destroy(): void {
+    this.disconnect();
     if (this.ctx) {
       this.ctx.close();
       this.ctx = null;

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>threnic-shaders • Dev</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 12px;
+  color: #e0e0e0;
+}
+
+canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+}
+
+/* ── Left Panel: Controls ────────────────────────────── */
+#controls {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  width: 260px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  z-index: 10;
+  background: rgba(10, 10, 15, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+#controls::-webkit-scrollbar { width: 4px; }
+#controls::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* ── Right Panel: Code Editor ────────────────────────── */
+#editorPanel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 460px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  z-index: 10;
+  background: rgba(10, 10, 15, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#editorPanel::-webkit-scrollbar { width: 4px; }
+#editorPanel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* ── Shared Styles ───────────────────────────────────── */
+.panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #fff;
+}
+.panel-subtitle {
+  font-size: 9px;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.group { display: flex; flex-direction: column; gap: 5px; }
+.group-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: rgba(255,255,255,0.35);
+}
+
+select {
+  width: 100%;
+  background: rgba(15, 15, 20, 0.95);
+  background-color: #1a1a22;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 6px 8px;
+  outline: none;
+  cursor: pointer;
+}
+select:hover { border-color: rgba(255,255,255,0.25); }
+select option {
+  background: #1a1a22;
+  color: #e0e0e0;
+  padding: 4px 8px;
+}
+select option:checked {
+  background: #3a3a4a;
+}
+select optgroup {
+  background: #1a1a22;
+  color: #999;
+  font-style: normal;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.slider-row label {
+  flex: 0 0 68px;
+  font-size: 9px;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.slider-row input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.12);
+  cursor: pointer;
+  outline: none;
+}
+.slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(255,255,255,0.3);
+}
+.slider-row .val {
+  flex: 0 0 30px;
+  text-align: right;
+  font-size: 9px;
+  color: rgba(255,255,255,0.5);
+}
+
+button {
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+button:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
+button.active { background: rgba(200, 50, 50, 0.3); border-color: rgba(255, 80, 80, 0.5); color: #ff8888; }
+button.primary {
+  background: rgba(80, 180, 255, 0.15);
+  border-color: rgba(80, 180, 255, 0.4);
+  color: #8ad4ff;
+}
+button.primary:hover {
+  background: rgba(80, 180, 255, 0.25);
+  border-color: rgba(80, 180, 255, 0.6);
+}
+
+.audio-row {
+  display: flex;
+  gap: 6px;
+}
+
+#status {
+  font-size: 9px;
+  color: rgba(255,255,255,0.4);
+  padding: 4px 0;
+}
+
+/* ── Code Editor ─────────────────────────────────────── */
+#codeEditor {
+  width: 100%;
+  min-height: 300px;
+  max-height: 60vh;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 10px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #c8d0e0;
+  resize: vertical;
+  outline: none;
+  overflow: auto;
+  tab-size: 2;
+}
+#codeEditor:focus {
+  border-color: rgba(80, 180, 255, 0.4);
+}
+
+.editor-toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.editor-toolbar .spacer { flex: 1; }
+
+#compileError {
+  display: none;
+  font-size: 10px;
+  color: #ff6b6b;
+  background: rgba(255, 60, 60, 0.08);
+  border: 1px solid rgba(255, 60, 60, 0.2);
+  border-radius: 4px;
+  padding: 6px 8px;
+  white-space: pre-wrap;
+}
+
+#fullSource {
+  display: none;
+  font-size: 9px;
+  line-height: 1.4;
+  color: rgba(255,255,255,0.5);
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px;
+  padding: 8px;
+  overflow: auto;
+  max-height: 200px;
+  white-space: pre;
+  font-family: inherit;
+}
+
+.hint {
+  font-size: 9px;
+  color: rgba(255,255,255,0.25);
+}
+
+input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<audio id="audioEl" crossorigin="anonymous" loop></audio>
+<input type="file" id="fileInput" accept="audio/*">
+
+<!-- ── Left Panel: Controls ────────────────────────── -->
+<div id="controls">
+  <div>
+    <div class="panel-title">threnic-shaders</div>
+    <div class="panel-subtitle">WebGPU Shader Engine</div>
+  </div>
+
+  <div class="group">
+    <div class="group-label">Preset</div>
+    <select id="preset">
+      <option value="tunnel">Stony Cave Tunnel</option>
+      <option value="rain">Rain / Snow</option>
+      <option value="clouds">Cloud Flight</option>
+      <option value="volumetric">Volumetric Clouds</option>
+      <option value="storm">Storm Clouds</option>
+      <option value="protean">Protean Clouds</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <div class="group-label">Palette</div>
+    <select id="palette">
+      <option value="ember">Ember</option>
+      <option value="ice">Ice</option>
+      <option value="toxic">Toxic</option>
+      <option value="vaporwave">Vaporwave</option>
+      <option value="mono">Mono</option>
+      <option value="stone">Stone</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <div class="group-label">Background Color</div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <input type="color" id="bgColor" value="#000000" style="width: 40px; height: 28px; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; background: none; cursor: pointer; padding: 0;">
+      <span id="bgColorVal" style="font-size: 10px; color: rgba(255,255,255,0.5);">#000000</span>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="slider-row">
+      <label>Opacity</label>
+      <input type="range" id="opacity" min="0" max="1" step="0.01" value="1">
+      <span class="val" id="opacityVal">1.00</span>
+    </div>
+    <div class="slider-row">
+      <label>Sensitivity</label>
+      <input type="range" id="sensitivity" min="0" max="1" step="0.01" value="0.7">
+      <span class="val" id="sensitivityVal">0.70</span>
+    </div>
+    <div class="slider-row">
+      <label id="p0Label">Param 0</label>
+      <input type="range" id="p0" min="0" max="1" step="0.01" value="0">
+      <span class="val" id="p0Val">0.00</span>
+    </div>
+    <div class="slider-row">
+      <label id="p1Label">Param 1</label>
+      <input type="range" id="p1" min="0" max="1" step="0.01" value="0.45">
+      <span class="val" id="p1Val">0.45</span>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group-label">Audio Source</div>
+    <div class="audio-row">
+      <button id="mic">🎤 Mic</button>
+      <button id="fileBtn">📁 File</button>
+      <button id="systemBtn">🖥️ System</button>
+    </div>
+    <div class="group" style="margin-top: 6px;">
+      <div class="group-label">Device</div>
+      <select id="deviceSel">
+        <option value="">— Select device —</option>
+      </select>
+      <button id="refreshDevices" style="font-size: 9px; padding: 3px 6px;">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div id="status">Ready</div>
+</div>
+
+<!-- ── Right Panel: Code Editor ────────────────────── -->
+<div id="editorPanel">
+  <div>
+    <div class="panel-title">WGSL Shader Editor</div>
+    <div class="panel-subtitle">Edit the render() function body • Ctrl+Enter to compile</div>
+  </div>
+
+  <div class="editor-toolbar">
+    <button id="compileBtn" class="primary">▶ Compile</button>
+    <button id="resetBtn">↺ Reset</button>
+    <span class="spacer"></span>
+    <button id="fullSourceBtn">👁 Show Full WGSL</button>
+  </div>
+
+  <div id="compileError"></div>
+
+  <textarea id="codeEditor" spellcheck="false" autocomplete="off" autocorrect="off"></textarea>
+
+  <pre id="fullSource"></pre>
+
+  <div class="hint">
+    Available: u_time(), u_beat(), u_bass(), u_mid(), u_treb(), u_energy(), u_react(),
+    u_p0(), u_p1(), u_resolution(), u_opacity(), palette(t), hash11(p), hash21(p),
+    hash22(p), noise(p), fbm(p)
+  </div>
+</div>
+
+<script type="module" src="./main.ts"></script>
+</body>
+</html>

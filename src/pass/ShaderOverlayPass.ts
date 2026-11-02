@@ -90,8 +90,8 @@ export class ShaderOverlayPass {
    * Returns true on success, false on shader compilation error.
    */
   async loadPreset(preset: ShaderPreset): Promise<boolean> {
-    // Skip re-compile if same preset already loaded
-    if (this._currentPreset?.id === preset.id && this.pipeline) return true;
+    // Skip re-compile if same preset already loaded (by id AND body content)
+    if (this._currentPreset?.id === preset.id && this._currentPreset?.body === preset.body && this.pipeline) return true;
 
     // Assemble full WGSL source: prelude + preset body + epilogue
     const source = SHADER_PRELUDE + '\n' + preset.body + '\n' + SHADER_EPILOGUE;
